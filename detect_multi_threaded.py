@@ -7,7 +7,7 @@ import cv2.aruco as aruco
 
 from utils import detector_utils as detector_utils
 from utils.detector_utils import WebcamVideoStream
-from utils.zmq_publisher import ZmqPublisher
+from utils.zmq_publisher import HandPositionPublisher, MarkerPublisher
 
 frame_processed = 0
 score_thresh = 0.2
@@ -47,16 +47,23 @@ def worker(input_q, output_q, center_points_q, cap_params):
                                                               cap_params["im_height"])
 
         center_points_q.put(hand_center_points)
+        print("center points: {}".format(hand_center_points))
 
         detector_utils.draw_box_on_image(
             cap_params['num_hands_detect'], cap_params["score_thresh"],
             scores, boxes, cap_params['im_width'], cap_params['im_height'],
             o_frame)
 
-        corners, ids, rejectedImgPoints = aruco.detectMarkers(frame, aruco_dict,
-                                                              parameters=parameters)
+        corners, ids, _ = aruco.detectMarkers(frame, aruco_dict,
+                                              parameters=parameters)
 
-        print(len(ids))
+        markers = []
+        for i in range(len(corners)):
+            markers.append({
+                'id': int(ids[i][0]),
+                'corners': corners[i][0].astype(int).tolist(),
+            })
+        marker_q.put(markers)
 
         aruco.drawDetectedMarkers(o_frame, corners, ids)
 
@@ -97,12 +104,17 @@ if __name__ == '__main__':
 
     input_q = Queue(maxsize=args.queue_size)
     output_q = Queue(maxsize=args.queue_size)
-    center_points_q = Queue(maxsize=args.queue_size)
+
+    # No max size here, because this would limit the amount of hand/markers we're able to detect per
+    # frame
+    center_points_q = Queue()
+    marker_q = Queue()
 
     cap_params = {}
     frame_processed = 0
 
-    ZmqPublisher(center_points_q).start()
+    HandPositionPublisher(center_points_q).start()
+    MarkerPublisher(marker_q).start()
 
     cap_params['score_thresh'] = score_thresh
 
@@ -115,8 +127,10 @@ if __name__ == '__main__':
         image_file = cv2.imread(args.image_file.name)
         cap_params['im_width'], cap_params['im_height'] = image_file.shape[0], image_file.shape[1]
 
+
         def next_image():
             return copy.deepcopy(image_file)
+
 
         def cleanup():
             args.image_file.close()
@@ -126,10 +140,12 @@ if __name__ == '__main__':
 
         cap_params['im_width'], cap_params['im_height'] = video_capture.size()
 
+
         def next_image():
             frame = video_capture.read()
             frame = cv2.flip(frame, 1)
             return frame
+
 
         def cleanup():
             video_capture.stop()
