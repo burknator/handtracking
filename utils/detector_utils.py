@@ -53,10 +53,7 @@ def load_inference_graph():
 def draw_box_on_image(num_hands_detect, score_thresh, scores, boxes, im_width, im_height, image_np):
     for i in range(num_hands_detect):
         if (scores[i] > score_thresh):
-            (left, right, top, bottom) = (boxes[i][1] * im_width, boxes[i][3] * im_width,
-                                          boxes[i][0] * im_height, boxes[i][2] * im_height)
-            p1 = (int(left), int(top))
-            p2 = (int(right), int(bottom))
+            p1, p2 = box_edges(boxes[i], im_height, im_width)
             cv2.rectangle(image_np, p1, p2, (77, 255, 9), 3, 1)
 
 
@@ -133,3 +130,27 @@ class WebcamVideoStream:
     def stop(self):
         # indicate that the thread should be stopped
         self.stopped = True
+
+
+def box_edges(box, im_height, im_width):
+    (left, right, top, bottom) = (box[1] * im_width, box[3] * im_width,
+                                  box[0] * im_height, box[2] * im_height)
+    p1 = (int(left), int(top))
+    p2 = (int(right), int(bottom))
+    return p1, p2
+
+
+def get_center_points(num_hands_detect, score_thresh, scores, boxes, im_width, im_height):
+    center_points = []
+    for i in range(num_hands_detect):
+        if scores[i] <= score_thresh:
+            continue
+
+        left_top, right_bottom = box_edges(boxes[i], im_height, im_width)
+
+        center = (left_top[0] + right_bottom[0], left_top[1] + right_bottom[1])
+        center = (center[0] / 2, center[1] / 2)
+
+        center_points.append(center)
+
+    return center_points
