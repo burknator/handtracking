@@ -1,117 +1,109 @@
-from utils import detector_utils as detector_utils
-import cv2
-import tensorflow as tf
-import multiprocessing
+import datetime, argparse, copy
+
 from multiprocessing import Queue, Pool
-import time
+
+import cv2
+import cv2.aruco as aruco
+
+from utils import detector_utils as detector_utils
 from utils.detector_utils import WebcamVideoStream
-import datetime
-import argparse
+from utils.zmq_publisher import ZmqPublisher
 
 frame_processed = 0
 score_thresh = 0.2
 
-# Create a worker thread that loads graph and
-# does detection on images in an input queue and puts it on an output queue
+# 117 was found out by testing with static test-images. The real number of the markers created by
+#  the Pupil team is not known/does not work
+#  (see https://github.com/pupil-labs/pupil-helpers/tree/master/markers_stickersheet).
+aruco_dict = aruco.Dictionary_create(117, 3)
+parameters = aruco.DetectorParameters_create()
 
 
-def worker(input_q, output_q, cap_params, frame_processed):
-    print(">> loading frozen model for worker")
+def worker(input_q, output_q, center_points_q, cap_params):
     detection_graph, sess = detector_utils.load_inference_graph()
-    sess = tf.Session(graph=detection_graph)
-    while True:
-        #print("> ===== in worker loop, frame ", frame_processed)
-        frame = input_q.get()
-        if (frame is not None):
-            # Actual detection. Variable boxes contains the bounding box cordinates for hands detected,
-            # while scores contains the confidence for each of these boxes.
-            # Hint: If len(boxes) > 1 , you may assume you have found atleast one hand (within your score threshold)
 
-            boxes, scores = detector_utils.detect_objects(
-                frame, detection_graph, sess)
-            # draw bounding boxes
-            detector_utils.draw_box_on_image(
-                cap_params['num_hands_detect'], cap_params["score_thresh"],
-                scores, boxes, cap_params['im_width'], cap_params['im_height'],
-                frame)
-            # add frame annotated with bounding box to queue
+    while True:
+        frame = input_q.get()
+
+        if frame is None:
             output_q.put(frame)
-            frame_processed += 1
-        else:
-            output_q.put(frame)
+            continue
+
+        # Create copy of frame to draw boxes on (we don't want to draw that on the input frame,
+        # because either of the detection algorithms could be disturbed by this).
+        o_frame = copy.deepcopy(frame)
+
+        # Actual detection. Variable boxes contains the bounding box coordinates for hands detected,
+        # while scores contains the confidence for each of these boxes.
+        # Hint: If len(boxes) > 1 , you may assume you have found at least one hand (within your
+        # score threshold)
+
+        boxes, scores = detector_utils.detect_objects(frame, detection_graph, sess)
+
+        hand_center_points = detector_utils.get_center_points(cap_params["num_hands_detect"],
+                                                              cap_params["score_thresh"],
+                                                              scores, boxes,
+                                                              cap_params["im_width"],
+                                                              cap_params["im_height"])
+
+        center_points_q.put(hand_center_points)
+
+        detector_utils.draw_box_on_image(
+            cap_params['num_hands_detect'], cap_params["score_thresh"],
+            scores, boxes, cap_params['im_width'], cap_params['im_height'],
+            o_frame)
+
+        corners, ids, rejectedImgPoints = aruco.detectMarkers(frame, aruco_dict,
+                                                              parameters=parameters)
+
+        print(len(ids))
+
+        aruco.drawDetectedMarkers(o_frame, corners, ids)
+
+        output_q.put(o_frame)
+
+        # TODO Publish marker information
+
+        # TODO Get translation matrices and draw AOI on image, BUT HOW DO GET AOI HERE?
+
     sess.close()
 
 
 if __name__ == '__main__':
 
+    # TODO Add option to generate markers
+
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-src',
-        '--source',
-        dest='video_source',
-        type=int,
-        default=0,
-        help='Device index of the camera.')
-    parser.add_argument(
-        '-nhands',
-        '--num_hands',
-        dest='num_hands',
-        type=int,
-        default=2,
-        help='Max number of hands to detect.')
-    parser.add_argument(
-        '-fps',
-        '--fps',
-        dest='fps',
-        type=int,
-        default=1,
-        help='Show FPS on detection/display visualization')
-    parser.add_argument(
-        '-wd',
-        '--width',
-        dest='width',
-        type=int,
-        default=300,
-        help='Width of the frames in the video stream.')
-    parser.add_argument(
-        '-ht',
-        '--height',
-        dest='height',
-        type=int,
-        default=200,
-        help='Height of the frames in the video stream.')
-    parser.add_argument(
-        '-ds',
-        '--display',
-        dest='display',
-        type=int,
-        default=1,
-        help='Display the detected images using OpenCV. This reduces FPS')
-    parser.add_argument(
-        '-num-w',
-        '--num-workers',
-        dest='num_workers',
-        type=int,
-        default=4,
-        help='Number of workers.')
-    parser.add_argument(
-        '-q-size',
-        '--queue-size',
-        dest='queue_size',
-        type=int,
-        default=5,
-        help='Size of the queue.')
+    parser.add_argument('-src', '--source', dest='video_source', type=int, default=0,
+                        help='Device index of the camera.')
+    parser.add_argument('-img', '--image', dest="image_file", type=open, default=None,
+                        help='For debugging purposes, you can provide a path to an image. Setting'
+                             'this will ignore the source setting.')
+    parser.add_argument('-nhands', '--num_hands', dest='num_hands', type=int, default=2,
+                        help='Max number of hands to detect.')
+    parser.add_argument('-fps', '--fps', dest='fps', type=int, default=1,
+                        help='Show FPS on detection/display visualization')
+    parser.add_argument('-wd', '--width', dest='width', type=int, default=504,
+                        help='Width of the frames in the video stream.')
+    parser.add_argument('-ht', '--height', dest='height', type=int, default=504,
+                        help='Height of the frames in the video stream.')
+    parser.add_argument('-ds', '--display', dest='display', type=int, default=1,
+                        help='Display the detected images using OpenCV. This reduces FPS')
+    parser.add_argument('-num-w', '--num-workers', dest='num_workers', type=int, default=4,
+                        help='Number of workers.')
+    parser.add_argument('-q-size', '--queue-size', dest='queue_size', type=int, default=5,
+                        help='Size of the queue.')
     args = parser.parse_args()
 
     input_q = Queue(maxsize=args.queue_size)
     output_q = Queue(maxsize=args.queue_size)
-
-    video_capture = WebcamVideoStream(
-        src=args.video_source, width=args.width, height=args.height).start()
+    center_points_q = Queue(maxsize=args.queue_size)
 
     cap_params = {}
     frame_processed = 0
-    cap_params['im_width'], cap_params['im_height'] = video_capture.size()
+
+    ZmqPublisher(center_points_q).start()
+
     cap_params['score_thresh'] = score_thresh
 
     # max number of hands we want to detect/track
@@ -119,9 +111,31 @@ if __name__ == '__main__':
 
     print(cap_params, args)
 
-    # spin up workers to paralleize detection.
-    pool = Pool(args.num_workers, worker,
-                (input_q, output_q, cap_params, frame_processed))
+    if args.image_file is not None:
+        image_file = cv2.imread(args.image_file.name)
+        cap_params['im_width'], cap_params['im_height'] = image_file.shape[0], image_file.shape[1]
+
+        def next_image():
+            return copy.deepcopy(image_file)
+
+        def cleanup():
+            args.image_file.close()
+    else:
+        video_capture = WebcamVideoStream(src=args.video_source, width=args.width,
+                                          height=args.height).start()
+
+        cap_params['im_width'], cap_params['im_height'] = video_capture.size()
+
+        def next_image():
+            frame = video_capture.read()
+            frame = cv2.flip(frame, 1)
+            return frame
+
+        def cleanup():
+            video_capture.stop()
+
+    worker_pool = Pool(args.num_workers, worker,
+                       (input_q, output_q, center_points_q, cap_params))
 
     start_time = datetime.datetime.now()
     num_frames = 0
@@ -131,8 +145,7 @@ if __name__ == '__main__':
     cv2.namedWindow('Multi-Threaded Detection', cv2.WINDOW_NORMAL)
 
     while True:
-        frame = video_capture.read()
-        frame = cv2.flip(frame, 1)
+        frame = next_image()
         index += 1
 
         input_q.put(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -145,16 +158,16 @@ if __name__ == '__main__':
         fps = num_frames / elapsed_time
         # print("frame ",  index, num_frames, elapsed_time, fps)
 
-        if (output_frame is not None):
-            if (args.display > 0):
-                if (args.fps > 0):
+        if output_frame is not None:
+            if args.display > 0:
+                if args.fps > 0:
                     detector_utils.draw_fps_on_image("FPS : " + str(int(fps)),
                                                      output_frame)
                 cv2.imshow('Multi-Threaded Detection', output_frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
             else:
-                if (num_frames == 400):
+                if num_frames == 400:
                     num_frames = 0
                     start_time = datetime.datetime.now()
                 else:
@@ -166,6 +179,6 @@ if __name__ == '__main__':
     elapsed_time = (datetime.datetime.now() - start_time).total_seconds()
     fps = num_frames / elapsed_time
     print("fps", fps)
-    pool.terminate()
-    video_capture.stop()
+    worker_pool.terminate()
+    cleanup()
     cv2.destroyAllWindows()
