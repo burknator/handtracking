@@ -40,8 +40,8 @@ class HandPositionPublisher(ZmqPublisher):
 
     def create_sensor_packet_from_data(self, datum):
         # TODO This adds a z-axis value of 0 to palm_position, that probably doesn't make any sense
-        return {"position_source": "camera", "palm_position": list(datum) + [0],
-                "timestamp": self.timestamp(), "confidence": 1.0}
+        return {"position_source": "camera", "palm_position": list(datum['palm_position']) + [0],
+                "timestamp": self.timestamp(), "confidence": datum['confidence']}
 
 
 class MarkerPublisher(ZmqPublisher):

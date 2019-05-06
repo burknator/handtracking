@@ -69,8 +69,6 @@ def worker(input_q, output_q, center_points_q, cap_params):
 
         output_q.put(o_frame)
 
-        # TODO Publish marker information
-
         # TODO Get translation matrices and draw AOI on image, BUT HOW DO GET AOI HERE?
 
     sess.close()
