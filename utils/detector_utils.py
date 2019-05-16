@@ -153,6 +153,7 @@ def get_center_points(num_hands_detect, score_thresh, scores, boxes, im_width, i
 
         center_points.append({
             'palm_position': center,
+            'box': left_top + right_bottom,
             'confidence': float(scores[i])
         })
 
