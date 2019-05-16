@@ -19,7 +19,7 @@ aruco_dict = aruco.Dictionary_create(117, 3)
 parameters = aruco.DetectorParameters_create()
 
 
-def worker(input_q, output_q, center_points_q, cap_params):
+def worker(input_q, output_q, marker_q, center_points_q, cap_params):
     detection_graph, sess = detector_utils.load_inference_graph()
 
     while True:
@@ -149,7 +149,7 @@ if __name__ == '__main__':
             video_capture.stop()
 
     worker_pool = Pool(args.num_workers, worker,
-                       (input_q, output_q, center_points_q, cap_params))
+                       (input_q, output_q, marker_q, center_points_q, cap_params))
 
     start_time = datetime.datetime.now()
     num_frames = 0
