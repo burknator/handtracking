@@ -26,6 +26,9 @@ if __name__ == '__main__':
     parser.add_argument('-img', '--image', dest="image_file", type=open, default=None,
                         help='For debugging purposes, you can provide a path to an image. Setting'
                              'this will ignore the source setting.')
+    parser.add_argument('-video', '--video', dest="video_file", type=open, default=None,
+                        help='For debugging purposes, you can provide a path to a video. Setting'
+                             'this will ignore the source setting.')
     parser.add_argument('-nhands', '--num_hands', dest='num_hands', type=int, default=2,
                         help='Max number of hands to detect.')
     parser.add_argument('-fps', '--fps', dest='fps', type=int, default=1,
@@ -43,6 +46,9 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--calibration-file', dest='calibration_file', type=open,
                         default=None, help='Camera calibration file.')
     args = parser.parse_args()
+
+    if args.video_file is not None and args.image_file is not None:
+        raise ValueError("Provide either video or image file, not both.")
 
     input_q = Queue(maxsize=args.queue_size)
     output_q = Queue(maxsize=args.queue_size)
@@ -69,25 +75,37 @@ if __name__ == '__main__':
         image_file = cv2.imread(args.image_file.name)
         cap_params['im_width'], cap_params['im_height'] = image_file.shape[0], image_file.shape[1]
 
-
         def next_image():
             return copy.deepcopy(image_file)
 
-
         def cleanup():
             args.image_file.close()
+    elif args.video_file is not None:
+        # If it's a video file, we want the system to take all the time it needs to process every
+        # single frame. Thus, the frame from the file are queued and processed one after another.
+        # To guarantee that the output is fluid when using a web cam, only the currently captured
+        # frame is processed.
+        video_capture = WebcamVideoStream(args.video_file.name, args.width, args.height, queued=True)\
+            .start()
+
+        cap_params['im_width'], cap_params['im_height'] = args.width, args.height
+
+        def next_image():
+            return video_capture.read()
+
+        def cleanup():
+            video_capture.stop()
     else:
-        video_capture = WebcamVideoStream(src=args.video_source, width=args.width,
-                                          height=args.height).start()
+        video_capture = WebcamVideoStream(args.video_source, args.width, args.height)\
+            .start()
 
-        cap_params['im_width'], cap_params['im_height'] = video_capture.size()
-
+        cap_params['im_width'], cap_params['im_height'] = args.width, args.height
 
         def next_image():
             frame = video_capture.read()
+            # Webcam frames need to be flipped, video file frame not.
             frame = cv2.flip(frame, 1)
             return frame
-
 
         def cleanup():
             video_capture.stop()

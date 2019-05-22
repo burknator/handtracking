@@ -64,19 +64,21 @@ class Worker:
             corners, ids, _ = aruco.detectMarkers(frame, type(self)._aruco_dict,
                                                   parameters=type(self)._aruco_parameters)
 
-            markers = []
-            for i in range(len(corners)):
-                markers.append({
-                    'id': int(ids[i][0]),
-                    'corners': corners[i][0].astype(int).tolist(),
-                })
-            self.marker_q.put(markers)
+            if ids is not None:
+                markers = []
+                for i in range(len(corners)):
+                    markers.append({
+                        'id': int(ids[i][0]),
+                        'corners': corners[i][0].astype(int).tolist(),
+                    })
+                self.marker_q.put(markers)
 
-            aruco.drawDetectedMarkers(o_frame, corners, ids)
+                aruco.drawDetectedMarkers(o_frame, corners, ids)
 
-            rotation_vecs, translation_vecs, _ = aruco.estimatePoseSingleMarkers(corners, self.calibration.ml, self.calibration.camera_matrix, self.calibration.dist_coeffs)
+                rotation_vecs, translation_vecs, _ = aruco.estimatePoseSingleMarkers(corners, self.calibration.ml, self.calibration.camera_matrix, self.calibration.dist_coeffs)
 
-            print("rvecs: {}, tvecs: {}".format(rotation_vecs, translation_vecs))
+                for i in range(len(ids)):
+                    aruco.drawAxis(o_frame, self.calibration.camera_matrix, self.calibration.dist_coeffs, rotation_vecs[i], translation_vecs[i], 0.01);
 
             self.output_q.put(o_frame)
 
