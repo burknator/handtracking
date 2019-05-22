@@ -7,6 +7,7 @@ from cv2 import aruco
 
 from .detector_utils import load_inference_graph, detect_objects, get_center_points,\
     draw_box_on_image
+from .calibration import Calibration
 
 class Worker:
 
@@ -17,12 +18,13 @@ class Worker:
     _aruco_parameters = aruco.DetectorParameters_create()
 
     def __init__(self, input_q: Queue, output_q: Queue, marker_q: Queue, center_points_q: Queue,
-        cap_params: Dict[str, Any]):
+        cap_params: Dict[str, Any], calibration: Calibration):
         self.input_q = input_q
         self.output_q = output_q
         self.marker_q = marker_q
         self.center_points_q = center_points_q
         self.cap_params = cap_params
+        self.calibration = calibration
 
     def run(self):
         detection_graph, sess = load_inference_graph()
@@ -71,6 +73,10 @@ class Worker:
             self.marker_q.put(markers)
 
             aruco.drawDetectedMarkers(o_frame, corners, ids)
+
+            rotation_vecs, translation_vecs, _ = aruco.estimatePoseSingleMarkers(corners, self.calibration.ml, self.calibration.camera_matrix, self.calibration.dist_coeffs)
+
+            print("rvecs: {}, tvecs: {}".format(rotation_vecs, translation_vecs))
 
             self.output_q.put(o_frame)
 

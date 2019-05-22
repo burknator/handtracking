@@ -5,7 +5,7 @@ from multiprocessing import Queue, Pool
 import cv2
 from cv2 import aruco
 
-from utils import detector_utils as detector_utils, Worker
+from utils import detector_utils as detector_utils, Worker, Calibration
 from utils.detector_utils import WebcamVideoStream
 from utils.zmq_publisher import HandPositionPublisher, MarkerPublisher
 
@@ -40,6 +40,8 @@ if __name__ == '__main__':
                         help='Number of workers.')
     parser.add_argument('-q-size', '--queue-size', dest='queue_size', type=int, default=5,
                         help='Size of the queue.')
+    parser.add_argument('-c', '--calibration-file', dest='calibration_file', type=open,
+                        default=None, help='Camera calibration file.')
     args = parser.parse_args()
 
     input_q = Queue(maxsize=args.queue_size)
@@ -90,8 +92,10 @@ if __name__ == '__main__':
         def cleanup():
             video_capture.stop()
 
+    calibration = Calibration(args.calibration_file)
+
     worker_pool = Pool(args.num_workers, worker,
-                       (input_q, output_q, marker_q, center_points_q, cap_params))
+                       (input_q, output_q, marker_q, center_points_q, cap_params, calibration))
 
     start_time = datetime.datetime.now()
     num_frames = 0
