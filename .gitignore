@@ -95,4 +95,11 @@ egohands/
 egohands_data.zip
 images/test/
 images/train/
+
+# Editor/IDE files
 .idea
+.vscode
+pyrightconfig.json
+
+# Test files
+/*.jpg
