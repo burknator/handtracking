@@ -9,7 +9,6 @@ from utils import detector_utils as detector_utils, Worker, Calibration
 from utils.detector_utils import WebcamVideoStream
 from utils.zmq_publisher import HandPositionPublisher, MarkerPublisher
 
-frame_processed = 0
 score_thresh = 0.2
 
 def worker(*args):
@@ -33,9 +32,9 @@ if __name__ == '__main__':
                         help='Max number of hands to detect.')
     parser.add_argument('-fps', '--fps', dest='fps', type=int, default=1,
                         help='Show FPS on detection/display visualization')
-    parser.add_argument('-wd', '--width', dest='width', type=int, default=504,
+    parser.add_argument('-wd', '--width', dest='width', type=int, default=888,
                         help='Width of the frames in the video stream.')
-    parser.add_argument('-ht', '--height', dest='height', type=int, default=504,
+    parser.add_argument('-ht', '--height', dest='height', type=int, default=500,
                         help='Height of the frames in the video stream.')
     parser.add_argument('-ds', '--display', dest='display', type=int, default=1,
                         help='Display the detected images using OpenCV. This reduces FPS')
@@ -59,7 +58,6 @@ if __name__ == '__main__':
     marker_q = Queue()
 
     cap_params = {}
-    frame_processed = 0
 
     HandPositionPublisher(center_points_q).start()
     MarkerPublisher(marker_q).start()
@@ -71,15 +69,18 @@ if __name__ == '__main__':
 
     print(cap_params, args)
 
+    next_image = None
+    cleanup = None
+
     if args.image_file is not None:
         image_file = cv2.imread(args.image_file.name)
         cap_params['im_width'], cap_params['im_height'] = image_file.shape[0], image_file.shape[1]
 
         def next_image():
             return copy.deepcopy(image_file)
-
-        def cleanup():
-            args.image_file.close()
+        
+        next_image = lambda: copy.deepcopy(image_file)
+        cleanup = lambda: args.image_file.close()
     elif args.video_file is not None:
         # If it's a video file, we want the system to take all the time it needs to process every
         # single frame. Thus, the frame from the file are queued and processed one after another.
@@ -90,25 +91,16 @@ if __name__ == '__main__':
 
         cap_params['im_width'], cap_params['im_height'] = args.width, args.height
 
-        def next_image():
-            return video_capture.read()
-
-        def cleanup():
-            video_capture.stop()
+        next_image = lambda: video_capture.read()
+        cleanup = lambda: video_capture.stop()
     else:
         video_capture = WebcamVideoStream(args.video_source, args.width, args.height)\
             .start()
 
         cap_params['im_width'], cap_params['im_height'] = args.width, args.height
 
-        def next_image():
-            frame = video_capture.read()
-            # Webcam frames need to be flipped, video file frame not.
-            frame = cv2.flip(frame, 1)
-            return frame
-
-        def cleanup():
-            video_capture.stop()
+        next_image = lambda: cv2.flip(video_capture.read(), 1)
+        cleanup = lambda: video_capture.stop()
 
     calibration = Calibration(args.calibration_file)
 
@@ -121,6 +113,9 @@ if __name__ == '__main__':
     index = 0
 
     cv2.namedWindow('Multi-Threaded Detection', cv2.WINDOW_NORMAL)
+
+    if next_image is None or cleanup is None:
+        raise RuntimeError("Something went deeply wrong.")
 
     while True:
         frame = next_image()
