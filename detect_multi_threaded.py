@@ -3,75 +3,17 @@ import datetime, argparse, copy
 from multiprocessing import Queue, Pool
 
 import cv2
-import cv2.aruco as aruco
+from cv2 import aruco
 
-from utils import detector_utils as detector_utils
+from utils import detector_utils as detector_utils, Worker
 from utils.detector_utils import WebcamVideoStream
 from utils.zmq_publisher import HandPositionPublisher, MarkerPublisher
 
 frame_processed = 0
 score_thresh = 0.2
 
-# 117 was found out by testing with static test-images. The real number of the markers created by
-#  the Pupil team is not known/does not work
-#  (see https://github.com/pupil-labs/pupil-helpers/tree/master/markers_stickersheet).
-aruco_dict = aruco.Dictionary_create(117, 3)
-parameters = aruco.DetectorParameters_create()
-
-
-def worker(input_q, output_q, marker_q, center_points_q, cap_params):
-    detection_graph, sess = detector_utils.load_inference_graph()
-
-    while True:
-        frame = input_q.get()
-
-        if frame is None:
-            output_q.put(frame)
-            continue
-
-        # Create copy of frame to draw boxes on (we don't want to draw that on the input frame,
-        # because either of the detection algorithms could be disturbed by this).
-        o_frame = copy.deepcopy(frame)
-
-        # Actual detection. Variable boxes contains the bounding box coordinates for hands detected,
-        # while scores contains the confidence for each of these boxes.
-        # Hint: If len(boxes) > 1 , you may assume you have found at least one hand (within your
-        # score threshold)
-
-        boxes, scores = detector_utils.detect_objects(frame, detection_graph, sess)
-
-        hand_center_points = detector_utils.get_center_points(cap_params["num_hands_detect"],
-                                                              cap_params["score_thresh"],
-                                                              scores, boxes,
-                                                              cap_params["im_width"],
-                                                              cap_params["im_height"])
-
-        center_points_q.put(hand_center_points)
-        print("center points: {}".format(hand_center_points))
-
-        detector_utils.draw_box_on_image(
-            cap_params['num_hands_detect'], cap_params["score_thresh"],
-            scores, boxes, cap_params['im_width'], cap_params['im_height'],
-            o_frame)
-
-        corners, ids, _ = aruco.detectMarkers(frame, aruco_dict,
-                                              parameters=parameters)
-
-        markers = []
-        for i in range(len(corners)):
-            markers.append({
-                'id': int(ids[i][0]),
-                'corners': corners[i][0].astype(int).tolist(),
-            })
-        marker_q.put(markers)
-
-        aruco.drawDetectedMarkers(o_frame, corners, ids)
-
-        output_q.put(o_frame)
-
-        # TODO Get translation matrices and draw AOI on image, BUT HOW DO GET AOI HERE?
-
-    sess.close()
+def worker(*args):
+    Worker(*args).run()
 
 
 if __name__ == '__main__':
