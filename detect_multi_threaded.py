@@ -76,9 +76,6 @@ if __name__ == '__main__':
         image_file = cv2.imread(args.image_file.name)
         cap_params['im_width'], cap_params['im_height'] = image_file.shape[0], image_file.shape[1]
 
-        def next_image():
-            return copy.deepcopy(image_file)
-        
         next_image = lambda: copy.deepcopy(image_file)
         cleanup = lambda: args.image_file.close()
     elif args.video_file is not None:
