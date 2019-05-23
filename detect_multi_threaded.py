@@ -99,6 +99,9 @@ if __name__ == '__main__':
         next_image = lambda: cv2.flip(video_capture.read(), 1)
         cleanup = lambda: video_capture.stop()
 
+    if next_image is None or cleanup is None:
+        raise RuntimeError("Something went deeply wrong.")
+
     calibration = Calibration(args.calibration_file)
 
     worker_pool = Pool(args.num_workers, worker,
@@ -110,9 +113,6 @@ if __name__ == '__main__':
     index = 0
 
     cv2.namedWindow('Multi-Threaded Detection', cv2.WINDOW_NORMAL)
-
-    if next_image is None or cleanup is None:
-        raise RuntimeError("Something went deeply wrong.")
 
     while True:
         frame = next_image()
