@@ -102,7 +102,10 @@ if __name__ == '__main__':
     if next_image is None or cleanup is None:
         raise RuntimeError("Something went deeply wrong.")
 
+    if args.calibration_file is not None:
     calibration = Calibration(args.calibration_file)
+    else:
+        calibration = None
 
     worker_pool = Pool(args.num_workers, worker,
                        (input_q, output_q, marker_q, center_points_q, cap_params, calibration))

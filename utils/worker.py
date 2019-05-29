@@ -19,7 +19,7 @@ _aruco_parameters = aruco.DetectorParameters_create()
 
 class Worker:
     def __init__(self, input_q: Queue, output_q: Queue, marker_q: Queue, center_points_q: Queue,
-        cap_params: Dict[str, Any], calibration: Calibration):
+                 cap_params: Dict[str, Any], calibration: Calibration = None):
         self.input_q = input_q
         self.output_q = output_q
         self.marker_q = marker_q
@@ -43,7 +43,7 @@ class Worker:
                                                 self.cap_params["im_height"])
 
         self.center_points_q.put(hand_center_points)
-        print("center points: {}".format(hand_center_points))
+        #print("center points: {}".format(hand_center_points))
 
         with o_frame.lock:
             draw_box_on_image(
@@ -67,11 +67,12 @@ class Worker:
             with o_frame.lock:
                 aruco.drawDetectedMarkers(o_frame.value, corners, ids)
 
-            rotation_vecs, translation_vecs, _ = aruco.estimatePoseSingleMarkers(corners, self.calibration.ml, self.calibration.camera_matrix, self.calibration.dist_coeffs)
+            if self.calibration is not None:
+                rotation_vecs, translation_vecs, _ = aruco.estimatePoseSingleMarkers(corners, self.calibration.ml, self.calibration.camera_matrix, self.calibration.dist_coeffs)
 
-            with o_frame.lock:
-                for i in range(len(ids)):
-                    aruco.drawAxis(o_frame.value, self.calibration.camera_matrix, self.calibration.dist_coeffs, rotation_vecs[i], translation_vecs[i], 0.01)
+                with o_frame.lock:
+                    for i in range(len(ids)):
+                        aruco.drawAxis(o_frame.value, self.calibration.camera_matrix, self.calibration.dist_coeffs, rotation_vecs[i], translation_vecs[i], 0.01)
 
     def run(self):
         while True:
