@@ -6,7 +6,7 @@ T = TypeVar('T')
 class SynchronizedVariable(Generic[T]):
     def __init__(self, variable: T):
         self._lock = Lock()
-        self._value: T = variable
+        self._value = variable
 
     @property
     def lock(self):
