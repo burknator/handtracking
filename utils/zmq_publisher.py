@@ -10,6 +10,7 @@ class ZmqPublisher(Thread):
         super().__init__()
         self.q = q
         self.topic = topic
+        self._cancel = False
 
         context = zmq.Context()
         self.publish_socket = context.socket(zmq.PUB)
@@ -20,6 +21,9 @@ class ZmqPublisher(Thread):
     def run(self):
         while True:
             data = self.q.get()
+            if self._cancel:
+                print("Stopping thread {}", self)
+                break
             for datum in data:
                 self.publish(self.create_sensor_packet_from_data(datum))
 
@@ -28,6 +32,13 @@ class ZmqPublisher(Thread):
 
     def create_sensor_packet_from_data(self, datum):
         raise NotImplementedError("This method needs to be implemented by a sub-class.")
+
+    def cancel(self):
+        self._cancel = True
+        # If the queue is empty, this thread will be blocked by self.q.get().
+        # To unblock it, we need to put an element in.
+        if self.q.empty():
+            self.q.put(None)
 
     @staticmethod
     def timestamp():
