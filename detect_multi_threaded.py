@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     def next_image(): return
 
-    def clenaup(): return
+    def cleanup(): return
 
     if args.image_file is not None:
         image_file = cv2.imread(args.image_file.name)
@@ -130,8 +130,6 @@ if __name__ == '__main__':
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
     def cleanup_():
-        cleanup()
-
         print("Stopping ZMQ publishers...")
         for publisher in zmq_publishers:
             publisher.cancel()
