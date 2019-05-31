@@ -6,7 +6,7 @@ import cv2
 from cv2 import aruco
 
 from utils import detector_utils as detector_utils, Worker, Calibration
-from utils.detector_utils import WebcamVideoStream
+from utils.webcam_video_stream import WebcamVideoStream
 from utils.zmq_publisher import HandPositionPublisher, MarkerPublisher
 
 score_thresh = 0.2
