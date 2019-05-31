@@ -59,7 +59,7 @@ def draw_box_on_image(num_hands_detect, score_thresh, scores, boxes, im_width,
 
 # Show fps value on image.
 def draw_fps_on_image(fps, image_np):
-    cv2.putText(image_np, fps, (20, 50),
+    cv2.putText(image_np, "FPS: {}".format(fps), (20, 50),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.75, (77, 255, 9), 2)
 
 
