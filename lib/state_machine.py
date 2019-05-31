@@ -43,7 +43,7 @@ class StateMachine:
         self._key_handler = lambda key: ()
         self._stop = False
         self.cleanup = lambda: ()
-        self.next_image = lambda: ()
+        self.next_image = None
 
     @property
     def current_state(self):

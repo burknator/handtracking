@@ -152,5 +152,6 @@ if __name__ == '__main__':
                                  display_output=args.display,
                                  draw_fps=args.fps)
     state_machine.cleanup = cleanup_
+    state_machine.next_image = next_image
 
     state_machine.run()
