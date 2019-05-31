@@ -3,7 +3,7 @@ import datetime
 
 from enum import Enum
 from queue import Queue
-from ..utils import detector_utils
+from utils import detector_utils
 
 
 class State(Enum):
