@@ -100,6 +100,7 @@ images/train/
 .idea
 .vscode
 pyrightconfig.json
+*.code-workspace
 
 # Test files
 /*.jpg
