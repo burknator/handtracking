@@ -2,7 +2,8 @@ import time
 
 from threading import Thread
 
-import zmq, msgpack as serializer
+import zmq
+import msgpack as serializer
 
 
 class ZmqPublisher(Thread):
@@ -28,10 +29,14 @@ class ZmqPublisher(Thread):
                 self.publish(self.create_sensor_packet_from_data(datum))
 
     def publish(self, data):
-        self.publish_socket.send_multipart([self.topic.encode("ASCII"), serializer.dumps(data)])
+        self.publish_socket.send_multipart([
+            self.topic.encode("ASCII"),
+            serializer.dumps(data)
+        ])
 
     def create_sensor_packet_from_data(self, datum):
-        raise NotImplementedError("This method needs to be implemented by a sub-class.")
+        raise NotImplementedError("This method needs to be implemented by a "
+                                  "sub-class.")
 
     def cancel(self):
         self._cancel = True
@@ -50,10 +55,11 @@ class HandPositionPublisher(ZmqPublisher):
         super().__init__(q, "han3")
 
     def create_sensor_packet_from_data(self, datum):
-        # TODO This adds a z-axis value of 0 to palm_position, that probably doesn't make any sense
-        return {"position_source": "camera", "palm_position": [0,0,0],
-                "timestamp": self.timestamp(), "confidence": datum['confidence'],
-                "box": datum["box"]}
+        # TODO This adds a z-axis value of 0 to palm_position, that probably
+        #  doesn't make any sense
+        return {"position_source": "camera", "palm_position": [0, 0, 0],
+                "timestamp": self.timestamp(),
+                "confidence": datum['confidence'], "box": datum["box"]}
 
 
 class MarkerPublisher(ZmqPublisher):

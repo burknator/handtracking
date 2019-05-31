@@ -16,7 +16,8 @@ sys.path.append("..")
 _score_thresh = 0.27
 
 MODEL_NAME = 'hand_inference_graph'
-# Path to frozen detection graph. This is the actual model that is used for the object detection.
+# Path to frozen detection graph. This is the actual model that is used for the
+# object detection.
 PATH_TO_CKPT = MODEL_NAME + '/frozen_inference_graph.pb'
 # List of the strings that is used to add correct label for each box.
 PATH_TO_LABELS = os.path.join(MODEL_NAME, 'hand_label_map.pbtxt')
@@ -48,7 +49,8 @@ def load_inference_graph():
 
 # draw the detected bounding boxes on the images
 # You can modify this to also draw a label.
-def draw_box_on_image(num_hands_detect, score_thresh, scores, boxes, im_width, im_height, image_np):
+def draw_box_on_image(num_hands_detect, score_thresh, scores, boxes, im_width,
+                      im_height, image_np):
     for i in range(num_hands_detect):
         if (scores[i] > score_thresh):
             p1, p2 = box_edges(boxes[i], im_height, im_width)
@@ -65,7 +67,8 @@ def draw_fps_on_image(fps, image_np):
 def detect_objects(image_np, detection_graph, sess):
     # Definite input and output Tensors for detection_graph
     image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
-    # Each box represents a part of the image where a particular object was detected.
+    # Each box represents a part of the image where a particular object was
+    # detected.
     detection_boxes = detection_graph.get_tensor_by_name(
         'detection_boxes:0')
     # Each score represent how level of confidence for each of the objects.
@@ -94,7 +97,8 @@ def box_edges(box, im_height, im_width):
     return p1, p2
 
 
-def get_center_points(num_hands_detect, score_thresh, scores, boxes, im_width, im_height):
+def get_center_points(num_hands_detect, score_thresh, scores, boxes, im_width,
+                      im_height):
     center_points = []
     for i in range(num_hands_detect):
         if scores[i] <= score_thresh:
