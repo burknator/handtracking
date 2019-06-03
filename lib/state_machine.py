@@ -101,6 +101,10 @@ class StateMachine:
     def _register_command(self, key, description, action):
         self._commands[key] = (description, action)
 
+    def _check_transition(self, state, allowed_origins):
+        if self.current_state not in list(allowed_origins):
+            raise InvalidTransitionError(self.current_state, state)
+
     def _enter_state(self, state: State):
         msg = "Entering state {}...".format(state.name)
         print('-' * len(msg))
@@ -172,9 +176,8 @@ class StateMachine:
             self.current_state = state
 
         elif state == State.DEFINE_AOI_MARKERSELECTION:
-            if self.current_state not in [State.INITIAL,
-                                          State.DEFINE_AOI_DRAW_AOI]:
-                raise InvalidTransitionError(self.current_state, state)
+            self._check_transition(state, [State.INITIAL,
+                                           State.DEFINE_AOI_DRAW_AOI])
 
             self._help_text = ("Use the left mouse button to draw an AOI into "
                                "the window.\nClick on a marker with the LEFT "
@@ -187,9 +190,8 @@ class StateMachine:
             self.current_state = state
 
         elif state == State.DEFINE_AOI_DRAW_AOI:
-            if self.current_state not in [State.DEFINE_AOI_MARKERSELECTION,
-                                          State.DEFINE_AOI_NAME_AOI]:
-                raise InvalidTransitionError(self.current_state, state)
+            self._check_transition(state, [State.DEFINE_AOI_MARKERSELECTION,
+                                           State.DEFINE_AOI_NAME_AOI])
 
             # TODO Register click handler to draw AOI
             # TODO After AOI is drawn, get into NAME_AOI state
@@ -197,8 +199,7 @@ class StateMachine:
             self.current_state = state
 
         elif state == State.DEFINE_AOI_NAME_AOI:
-            if self.current_state != State.DEFINE_AOI_DRAW_AOI:
-                raise InvalidTransitionError(self.current_state, state)
+            self._check_transition(state, State.DEFINE_AOI_DRAW_AOI)
 
             # TODO Ask user for name of AOI
 
