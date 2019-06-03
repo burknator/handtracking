@@ -24,6 +24,7 @@ class ZmqPublisher(Thread):
             data = self.q.get()
             if self._cancel:
                 print("Stopping thread {}", self)
+                self.publish_socket.close()
                 break
             for datum in data:
                 self.publish(self.create_sensor_packet_from_data(datum))
