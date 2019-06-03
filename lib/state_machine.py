@@ -67,6 +67,22 @@ class StateMachine:
         elapsed_time = self._get_elapsed_time()
         return self._num_frames / elapsed_time, elapsed_time
 
+    def _return_to_previous_state(self):
+        try:
+            self._enter_state(self._previous_state)
+        except InvalidTransitionError as e:
+            if e.end != State.INITIAL:
+                # Try to enter the initial state if the previous state could
+                # not be entered.
+                self._enter_state(State.INITIAL)
+            else:
+                # If we already tried to enter the initial state, but failed at
+                # that, we raise an exception, because the initial state must
+                # always be enterable.
+                raise Exception("Tried to re-enter the initial state {}, but "
+                                "it didn't work, although it should've."
+                                .format(e.end.name))
+
     def _enter_state(self, state: State):
         print("Entering state {}...".format(state.name))
 
@@ -169,18 +185,8 @@ class StateMachine:
 
             if key == 'q':
                 self._enter_state(State.EXITING)
-
             elif key == 'c':
-                try:
-                    self._enter_state(self._previous_state)
-                except InvalidTransitionError as e:
-                    if e.end != State.NORMAL:
-                        self._enter_state(State.NORMAL)
-                    else:
-                        raise Exception("Tried to re-enter state {}, but it "
-                                        "didn't work, although it should've. "
-                                        "This is a programmer error."
-                                        .format(e.end.name))
+                self._return_to_previous_state()
 
             # TODO Also handle pressed keys in console!!
             self._key_handler(key)
