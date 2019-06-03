@@ -91,7 +91,7 @@ class StateMachine:
 
     def _read_input(self):
         while True:
-            input_ = input("Enter command and press return:\n")
+            input_ = input()
             self._kbd_input_queue.put(input_)
 
     def _start_kbd_capture(self):
@@ -99,7 +99,10 @@ class StateMachine:
         self._kbd_capture_thread.start()
 
     def _enter_state(self, state: State):
-        print("Entering state {}...".format(state.name))
+        msg = "Entering state {}...".format(state.name)
+        print('-' * len(msg))
+        print(msg)
+        print()
 
         """
         Zustände:
@@ -180,7 +183,10 @@ class StateMachine:
             if self.output_queue.empty():
                 self.output_queue.put(None)
 
-        print(self._help_text)
+        if self._help_text:
+            print(self._help_text)
+
+        print("Enter a command and press return: ", end="", flush=True)
 
     def run(self):
         if self.next_image is None:
