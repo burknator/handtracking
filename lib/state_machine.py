@@ -4,6 +4,7 @@ import datetime
 from enum import Enum
 from queue import Queue
 from utils import detector_utils
+from threading import Thread
 
 
 class State(Enum):
@@ -47,6 +48,9 @@ class StateMachine:
         self._stop = False
         self._help_text = ""
 
+        self._kbd_input_queue = Queue()
+        self._kbd_capture_thread = None
+
     @property
     def current_state(self):
         return self._current_state
@@ -84,6 +88,15 @@ class StateMachine:
                 raise Exception("Tried to re-enter the initial state {}, but "
                                 "it didn't work, although it should've."
                                 .format(e.end.name))
+
+    def _read_input(self):
+        while True:
+            input_ = input("Enter command and press return:")
+            self._kbd_input_queue.put(input_)
+
+    def _start_kbd_capture(self):
+        self._kbd_capture_thread = Thread(target=self._read_input, daemon=True)
+        self._kbd_capture_thread.start()
 
     def _enter_state(self, state: State):
         print("Entering state {}...".format(state.name))
@@ -182,10 +195,15 @@ class StateMachine:
 
         self._start_time = datetime.datetime.now()
 
+        self._start_kbd_capture()
+
         self._enter_state(State.INITIAL)
 
         while True:
-            key = chr(cv2.waitKey(1) & 0xFF).lower()
+            if self._kbd_input_queue.qsize() > 0:
+                key = self._kbd_input_queue.get().lower()
+            else:
+                key = chr(cv2.waitKey(1) & 0xFF).lower()
 
             if key == 'q':
                 self._enter_state(State.EXITING)
