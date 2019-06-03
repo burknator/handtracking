@@ -126,7 +126,7 @@ class StateMachine:
                     self._enter_state(State.PAUSED)
 
                 elif key == 'a':
-                    self._enter_state(State.DEFINE_AOI)
+                    self._enter_state(State.DEFINE_AOI_MARKERSELECTION)
 
             self._click_handler = lambda *args: ()
             self._key_handler = normal_key_handler
@@ -147,14 +147,8 @@ class StateMachine:
             self._key_handler = pause_key_handler
 
             self.current_state = state
-        elif state == State.DEFINE_AOI:
-            # TODO Pause playback, essentially activate pause state
-            self._click_handler = lambda *args: ()
-
-            # Directly jump into marker selection
-            self._enter_state(State.DEFINE_AOI_MARKERSELECTION)
         elif state == State.DEFINE_AOI_MARKERSELECTION:
-            if self.current_state not in [State.DEFINE_AOI,
+            if self.current_state not in [State.INITIAL,
                                           State.DEFINE_AOI_DRAW_AOI]:
                 raise InvalidTransitionError(self.current_state, state)
 
