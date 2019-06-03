@@ -105,6 +105,14 @@ class StateMachine:
         if self.current_state not in allowed_origins:
             raise InvalidTransitionError(self.current_state, state)
 
+    def _input(self, prompt=''):
+        """
+        Replaces Python `input()` function in this programm, because of the
+        keyboard input capture loop started in `_start_kbd_capture`.
+        """
+        print(prompt, end='', flush=True)
+        return self._kbd_input_queue.get()
+
     def _enter_state(self, state: State):
         msg = "Entering state {}...".format(state.name)
         print('-' * len(msg))
