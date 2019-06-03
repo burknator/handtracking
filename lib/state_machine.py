@@ -46,7 +46,6 @@ class StateMachine:
         self._click_handler = lambda event, x, y, flags, param: ()
         self._key_handler = lambda key: ()
         self._stop = False
-        self._help_text = ""
 
         self._kbd_input_queue = Queue()
         self._kbd_capture_thread = None
@@ -115,6 +114,8 @@ class StateMachine:
         # Reset command list, as each state has it's own commands.
         self._commands = {}
 
+        help_text = ""
+
         # Define default commands
         self._register_command(
             key='q',
@@ -137,8 +138,6 @@ class StateMachine:
             # makes sense because it basically means we restart the programm,
             # but without the hassle of actually restarting the programm.
             # TODO Start playback
-
-            self._help_text = ""
 
             self._register_command(
                 key='p',
@@ -180,10 +179,9 @@ class StateMachine:
             self._check_transition(state, [State.INITIAL,
                                            State.DEFINE_AOI_DRAW_AOI])
 
-            self._help_text = ("Use the left mouse button to draw an AOI into "
-                               "the window.\nClick on a marker with the LEFT "
-                               "mouse button to select it for the current AOI,"
-                               " use the RIGHT mouse button to deselect it.")
+            help_text = ("Click on a marker with the LEFT mouse button "
+                         "to select it for the current AOI, use the "
+                         "RIGHT mouse button to deselect it.")
 
             # TODO Register click handler for marker selection
             # TODO Left click selects marker, right click deselects marker
@@ -214,8 +212,8 @@ class StateMachine:
             if self.output_queue.empty():
                 self.output_queue.put(None)
 
-        if self._help_text:
-            print(self._help_text)
+        if help_text:
+            print(help_text)
 
         for key, content in self._commands.items():
             help_text, _ = content
