@@ -8,7 +8,6 @@ from threading import Thread
 
 
 class State(Enum):
-    DEFINE_AOI = 1
     DEFINE_AOI_MARKERSELECTION = 11
     DEFINE_AOI_DRAW_AOI = 12
     DEFINE_AOI_NAME_AOI = 13
@@ -50,6 +49,7 @@ class StateMachine:
 
         self._kbd_input_queue = Queue()
         self._kbd_capture_thread = None
+        self._commands = {}
 
     @property
     def current_state(self):
@@ -98,23 +98,34 @@ class StateMachine:
         self._kbd_capture_thread = Thread(target=self._read_input, daemon=True)
         self._kbd_capture_thread.start()
 
+    def _register_command(self, key, description, action):
+        self._commands[key] = (description, action)
+
     def _enter_state(self, state: State):
         msg = "Entering state {}...".format(state.name)
         print('-' * len(msg))
         print(msg)
         print()
 
-        """
-        Zustände:
-        1. AOI bestimmen
-            1. Markerselektion
-            2. AOI per Maus ins Bild ziehen (als Rechteck erst mal)
-            3. Zurück zu Schritt 1.1 oder abbrechen
-        2. Pausiert
-            Bei Video und Webcam einfach Bild einfrieren. Bei Video zusätzlich
-             Bild für Bild durchschalten können.
-        3. Normal
-        """
+        # Reset command list, as each state has it's own commands.
+        self._commands = {}
+
+        # Define default commands
+        self._register_command(
+            key='q',
+            description="Exit program.",
+            action=State.EXITING
+        )
+
+        if state != State.INITIAL:
+            # The user can only return to the previous state if the program is
+            # not in INITIAL.
+            self._register_command(
+                key='c',
+                description="Cancel current operation and go to previous "
+                            "state ({}).".format(self._previous_state.name),
+                action=lambda: self._return_to_previous_state()
+            )
 
         if state == State.INITIAL:
             # There must be a transition from every state into this one. This
@@ -124,17 +135,26 @@ class StateMachine:
 
             self._help_text = ""
 
-            def normal_key_handler(key: str):
-                if key == 'p':
-                    self._enter_state(State.PAUSED)
+            self._register_command(
+                key='p',
+                description="Pause playback.",
+                action=State.PAUSED
+            )
 
-                elif key == 'a':
-                    self._enter_state(State.DEFINE_AOI_MARKERSELECTION)
+            self._register_command(
+                key='a',
+                description="Start defining AOI.",
+                action=State.DEFINE_AOI_MARKERSELECTION
+            )
+
+            def normal_key_handler(key: str):
+                pass
 
             self._click_handler = lambda *args: ()
             self._key_handler = normal_key_handler
 
             self.current_state = state
+
         elif state == State.PAUSED:
             # TODO Stop playback, activate forward (and backward?) frame
             #  skipping
@@ -150,15 +170,22 @@ class StateMachine:
             self._key_handler = pause_key_handler
 
             self.current_state = state
+
         elif state == State.DEFINE_AOI_MARKERSELECTION:
             if self.current_state not in [State.INITIAL,
                                           State.DEFINE_AOI_DRAW_AOI]:
                 raise InvalidTransitionError(self.current_state, state)
 
+            self._help_text = ("Use the left mouse button to draw an AOI into "
+                               "the window.\nClick on a marker with the LEFT "
+                               "mouse button to select it for the current AOI,"
+                               " use the RIGHT mouse button to deselect it.")
+
             # TODO Register click handler for marker selection
             # TODO Left click selects marker, right click deselects marker
 
             self.current_state = state
+
         elif state == State.DEFINE_AOI_DRAW_AOI:
             if self.current_state not in [State.DEFINE_AOI_MARKERSELECTION,
                                           State.DEFINE_AOI_NAME_AOI]:
@@ -168,6 +195,7 @@ class StateMachine:
             # TODO After AOI is drawn, get into NAME_AOI state
 
             self.current_state = state
+
         elif state == State.DEFINE_AOI_NAME_AOI:
             if self.current_state != State.DEFINE_AOI_DRAW_AOI:
                 raise InvalidTransitionError(self.current_state, state)
@@ -175,6 +203,7 @@ class StateMachine:
             # TODO Ask user for name of AOI
 
             self.current_state = state
+
         elif state == State.EXITING:
             self._stop = True
             self.current_state = state
@@ -186,7 +215,27 @@ class StateMachine:
         if self._help_text:
             print(self._help_text)
 
+        for key, content in self._commands.items():
+            help_text, _ = content
+
+            if not help_text:
+                continue
+
+            print("{}: {}".format(key.upper(), help_text))
+
         print("Enter a command and press return: ", end="", flush=True)
+
+    def handle_input(self, input_):
+        if input_ not in self._commands:
+            return
+
+        action = self._commands[input_][1]
+        if callable(action):
+            action()
+        elif isinstance(action, State):
+            self._enter_state(action)
+
+        self._key_handler(input_)
 
     def run(self):
         if self.next_image is None:
@@ -208,13 +257,7 @@ class StateMachine:
             else:
                 key = chr(cv2.waitKey(1) & 0xFF).lower()
 
-            if key == 'q':
-                self._enter_state(State.EXITING)
-            elif key == 'c':
-                self._return_to_previous_state()
-
-            # TODO Also handle pressed keys in console!!
-            self._key_handler(key)
+            self.handle_input(key)
 
             if self._stop:
                 print("Exiting...")
