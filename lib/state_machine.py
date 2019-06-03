@@ -91,7 +91,7 @@ class StateMachine:
 
     def _read_input(self):
         while True:
-            input_ = input("Enter command and press return:")
+            input_ = input("Enter command and press return:\n")
             self._kbd_input_queue.put(input_)
 
     def _start_kbd_capture(self):
@@ -195,9 +195,12 @@ class StateMachine:
 
         self._start_time = datetime.datetime.now()
 
-        self._start_kbd_capture()
-
+        # First, enter initial state. It can register commands which need to
+        # be captured by `_start_kbd_capture()`.
         self._enter_state(State.INITIAL)
+
+        # Start capturing user-input
+        self._start_kbd_capture()
 
         while True:
             if self._kbd_input_queue.qsize() > 0:
