@@ -5,6 +5,7 @@ from enum import Enum
 from queue import Queue
 from utils import detector_utils
 from threading import Thread
+from typing import List
 
 
 class State(Enum):
@@ -101,8 +102,8 @@ class StateMachine:
     def _register_command(self, key, description, action):
         self._commands[key] = (description, action)
 
-    def _check_transition(self, state, allowed_origins):
-        if self.current_state not in list(allowed_origins):
+    def _check_transition(self, state, allowed_origins: List):
+        if self.current_state not in allowed_origins:
             raise InvalidTransitionError(self.current_state, state)
 
     def _enter_state(self, state: State):
