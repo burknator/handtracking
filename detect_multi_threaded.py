@@ -77,8 +77,6 @@ if __name__ == '__main__':
     # max number of hands we want to detect/track
     cap_params['num_hands_detect'] = args.num_hands
 
-    print(cap_params, args)
-
     def next_image(): return
 
     def cleanup(): return
