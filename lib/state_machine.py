@@ -12,7 +12,7 @@ class State(Enum):
     DEFINE_AOI_DRAW_AOI = 12
     DEFINE_AOI_NAME_AOI = 13
     PAUSED = 2
-    NORMAL = 3
+    INITIAL = 3
     EXITING = 4
 
 
@@ -35,15 +35,17 @@ class StateMachine:
         self.display_output = display_output
         self.draw_fps = draw_fps
 
-        self._current_state = State.NORMAL
-        self._previous_state = State.NORMAL
+        self.cleanup = lambda: ()
+        self.next_image = None
+
+        self._current_state = State.INITIAL
+        self._previous_state = State.INITIAL
         self._start_time = datetime.datetime.now()
         self._num_frames = 0
         self._click_handler = lambda event, x, y, flags, param: ()
         self._key_handler = lambda key: ()
         self._stop = False
-        self.cleanup = lambda: ()
-        self.next_image = None
+        self._help_text = ""
 
     @property
     def current_state(self):
@@ -98,8 +100,13 @@ class StateMachine:
         3. Normal
         """
 
-        if state == State.NORMAL:
+        if state == State.INITIAL:
+            # There must be a transition from every state into this one. This
+            # makes sense because it basically means we restart the programm,
+            # but without the hassle of actually restarting the programm.
             # TODO Start playback
+
+            self._help_text = ""
 
             def normal_key_handler(key: str):
                 if key == 'p':
@@ -112,7 +119,6 @@ class StateMachine:
             self._key_handler = normal_key_handler
 
             self.current_state = state
-            return
         elif state == State.PAUSED:
             # TODO Stop playback, activate forward (and backward?) frame
             #  skipping
@@ -128,14 +134,12 @@ class StateMachine:
             self._key_handler = pause_key_handler
 
             self.current_state = state
-            return
         elif state == State.DEFINE_AOI:
             # TODO Pause playback, essentially activate pause state
             self._click_handler = lambda *args: ()
 
             # Directly jump into marker selection
             self._enter_state(State.DEFINE_AOI_MARKERSELECTION)
-            return
         elif state == State.DEFINE_AOI_MARKERSELECTION:
             if self.current_state not in [State.DEFINE_AOI,
                                           State.DEFINE_AOI_DRAW_AOI]:
@@ -145,7 +149,6 @@ class StateMachine:
             # TODO Left click selects marker, right click deselects marker
 
             self.current_state = state
-            return
         elif state == State.DEFINE_AOI_DRAW_AOI:
             if self.current_state not in [State.DEFINE_AOI_MARKERSELECTION,
                                           State.DEFINE_AOI_NAME_AOI]:
@@ -155,7 +158,6 @@ class StateMachine:
             # TODO After AOI is drawn, get into NAME_AOI state
 
             self.current_state = state
-            return
         elif state == State.DEFINE_AOI_NAME_AOI:
             if self.current_state != State.DEFINE_AOI_DRAW_AOI:
                 raise InvalidTransitionError(self.current_state, state)
@@ -163,7 +165,6 @@ class StateMachine:
             # TODO Ask user for name of AOI
 
             self.current_state = state
-            return
         elif state == State.EXITING:
             self._stop = True
             self.current_state = state
@@ -171,7 +172,8 @@ class StateMachine:
             # be blocked
             if self.output_queue.empty():
                 self.output_queue.put(None)
-            return
+
+        print(self._help_text)
 
     def run(self):
         if self.next_image is None:
@@ -179,6 +181,8 @@ class StateMachine:
                             "images (`next_image`).")
 
         self._start_time = datetime.datetime.now()
+
+        self._enter_state(State.INITIAL)
 
         while True:
             key = chr(cv2.waitKey(1) & 0xFF).lower()
@@ -208,7 +212,6 @@ class StateMachine:
 
             if output_frame is None:
                 print("Received empty output frame, exiting...")
-                self._enter_state(State.EXITING)
                 break
 
             output_frame = cv2.cvtColor(output_frame, cv2.COLOR_RGB2BGR)
