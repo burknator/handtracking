@@ -4,7 +4,7 @@ import datetime
 from enum import Enum
 from queue import Queue
 from utils import detector_utils
-from typing import List, Callable, Union, Tuple, Any
+from typing import List, Callable, Tuple
 
 from .command_line_input import CommandLineInput
 
@@ -16,14 +16,6 @@ class State(Enum):
     PAUSED = 2
     INITIAL = 3
     EXITING = 4
-
-
-class Command:
-    def __init__(self, cmd: Callable[[], Any]):
-        self.execute = cmd
-
-    def execute(self):
-        pass
 
 
 class CommandNotFoundException(Exception):
@@ -101,19 +93,14 @@ class StateMachine:
                                 "it didn't work, although it should've."
                                 .format(e.end.name))
 
-    def _register_command(self, key: str, description: str,
-                          action: Union[Command, State]):
-
-        if isinstance(action, State):
-            action = Command(lambda: self._enter_state(action))
-
+    def _register_command(self, key: str, description: str, action: Callable):
         self._commands[key] = (description, action)
 
     def _check_transition(self, state: State, allowed_origins: List[State]):
         if self.current_state not in allowed_origins:
             raise InvalidTransitionError(self.current_state, state)
 
-    def _get_command(self, command: str) -> Tuple[str, Command]:
+    def _get_command(self, command: str) -> Tuple[str, Callable]:
         if command not in self._commands:
             raise CommandNotFoundException("The command {} is not vaild."
                                            .format(command))
@@ -134,6 +121,23 @@ class StateMachine:
         # Execute any callback which may have been defined by entering a state.
         self._key_handler(input_)
 
+    def _show_help(self, help_text: str):
+        if help_text:
+            print(help_text)
+
+        for key, content in self._commands.items():
+            help_text, _ = content
+
+            if not help_text:
+                continue
+
+            print("{}: {}".format(key.upper(), help_text))
+
+        # Ask the user for input. Technically, they could've entered a command
+        # at any time. The actual `input`-call which captures this input is in
+        # `_start_kbd_capture()`.
+        print("Enter a command and press return: ", end="", flush=True)
+
     def _enter_state(self, state: State):
         msg = "Entering state {}...".format(state.name)
         print('-' * len(msg))
@@ -149,7 +153,7 @@ class StateMachine:
         self._register_command(
             key='q',
             description="Exit program.",
-            action=State.EXITING
+            action=lambda: self._enter_state(State.EXITING)
         )
 
         if state != State.INITIAL:
@@ -159,7 +163,7 @@ class StateMachine:
                 key='c',
                 description="Cancel current operation and go to previous "
                             "state ({}).".format(self._previous_state.name),
-                action=Command(lambda: self._return_to_previous_state())
+                action=lambda: self._return_to_previous_state()
             )
 
         if state == State.INITIAL:
@@ -171,13 +175,13 @@ class StateMachine:
             self._register_command(
                 key='p',
                 description="Pause playback.",
-                action=State.PAUSED
+                action=lambda: self._enter_state(State.PAUSED)
             )
 
             self._register_command(
                 key='a',
                 description="Start defining AOI.",
-                action=State.DEFINE_AOI_MARKERSELECTION
+                action=lambda: self._enter_state(State.DEFINE_AOI_MARKERSELECTION)
             )
 
             def normal_key_handler(key: str):
@@ -220,7 +224,7 @@ class StateMachine:
                 key='d',
                 description='Save current marker selection and continue to the'
                             'next step.',
-                action=State.DEFINE_AOI_DRAW_AOI
+                action=lambda: self._enter_state(State.DEFINE_AOI_DRAW_AOI)
             )
 
             self.current_state = state
@@ -236,7 +240,7 @@ class StateMachine:
                 key='d',
                 description='Save the current AOI and continue to the next '
                             'step.',
-                action=State.DEFINE_AOI_NAME_AOI
+                action=lambda: self._enter_state(State.DEFINE_AOI_NAME_AOI)
             )
 
             # TODO Register click handler to draw AOI
@@ -253,7 +257,7 @@ class StateMachine:
             self._register_command(
                 key='d',
                 description='Save the current AOI and add another one.',
-                action=State.DEFINE_AOI_MARKERSELECTION
+                action=lambda: self._enter_state(State.DEFINE_AOI_MARKERSELECTION)
             )
 
             self.current_state = state
@@ -266,21 +270,7 @@ class StateMachine:
             if self.output_queue.empty():
                 self.output_queue.put(None)
 
-        if help_text:
-            print(help_text)
-
-        for key, content in self._commands.items():
-            help_text, _ = content
-
-            if not help_text:
-                continue
-
-            print("{}: {}".format(key.upper(), help_text))
-
-        # Ask the user for input. Technically, they could've entered a command
-        # at any time. The actual `input`-call which captures this input is in
-        # `_start_kbd_capture()`.
-        print("Enter a command and press return: ", end="", flush=True)
+        self._show_help(help_text)
 
     def run(self):
         if self.next_image is None:
