@@ -116,7 +116,7 @@ class StateMachine:
             # TODO Let the user know, that the input was not a valid command.
             return
 
-        action.execute()
+        action()
 
         # Execute any callback which may have been defined by entering a state.
         self._key_handler(input_)
