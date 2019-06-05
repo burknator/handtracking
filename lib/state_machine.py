@@ -4,9 +4,9 @@ import datetime
 from enum import Enum
 from queue import Queue
 from utils import detector_utils
-from threading import Thread
 from typing import List
 
+from .command_line_input import CommandLineInput
 
 class State(Enum):
     DEFINE_AOI_MARKERSELECTION = 11
@@ -29,7 +29,8 @@ class InvalidTransitionError(Exception):
 class StateMachine:
 
     def __init__(self, window_name: str, input_queue: Queue,
-                 output_queue: Queue, display_output=False, draw_fps=False):
+                 output_queue: Queue, cli_input: CommandLineInput,
+                 display_output=False, draw_fps=False):
         self.window_name = window_name
         self.input_queue = input_queue
         self.output_queue = output_queue
@@ -46,8 +47,7 @@ class StateMachine:
         self._click_handler = lambda event, x, y, flags, param: ()
         self._key_handler = lambda key: ()
         self._stop = False
-
-        self._kbd_input_queue = Queue()
+        self._cli = cli_input
         self._commands = {}
 
     @property
@@ -88,28 +88,12 @@ class StateMachine:
                                 "it didn't work, although it should've."
                                 .format(e.end.name))
 
-    def _kbd_input(self):
-        while True:
-            input_ = input()
-            self._kbd_input_queue.put(input_)
-
-    def _start_kbd_capture(self):
-        Thread(target=self._kbd_input, daemon=True).start()
-
     def _register_command(self, key, description, action):
         self._commands[key] = (description, action)
 
     def _check_transition(self, state, allowed_origins: List):
         if self.current_state not in allowed_origins:
             raise InvalidTransitionError(self.current_state, state)
-
-    def _input(self, prompt=''):
-        """
-        Replaces Python `input()` function in this programm, because of the
-        keyboard input capture loop started in `_start_kbd_capture`.
-        """
-        print(prompt, end='', flush=True)
-        return self._kbd_input_queue.get()
 
     def _enter_state(self, state: State):
         msg = "Entering state {}...".format(state.name)
@@ -224,7 +208,7 @@ class StateMachine:
         elif state == State.DEFINE_AOI_NAME_AOI:
             self._check_transition(state, [State.DEFINE_AOI_DRAW_AOI])
 
-            aoi_name = self._input('Enter name for AOI: ')
+            aoi_name = self._cli.input('Enter name for AOI: ')
             print("Chosen name: {}".format(aoi_name))
 
             self._register_command(
@@ -286,15 +270,12 @@ class StateMachine:
         self._start_time = datetime.datetime.now()
 
         # First, enter initial state. It can register commands which need to
-        # be captured by `_start_kbd_capture()`.
+        # be captured by `_cli`.
         self._enter_state(State.INITIAL)
 
-        # Start capturing user-input
-        self._start_kbd_capture()
-
         while True:
-            if self._kbd_input_queue.qsize() > 0:
-                key = self._kbd_input_queue.get().lower()
+            if self._cli.has_input():
+                key = self._cli.get_input().lower()
             else:
                 key = chr(cv2.waitKey(1) & 0xFF).lower()
 

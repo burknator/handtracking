@@ -9,6 +9,7 @@ from utils import detector_utils as detector_utils, Worker, Calibration
 from utils.webcam_video_stream import WebcamVideoStream
 from utils.zmq_publisher import HandPositionPublisher, MarkerPublisher
 from lib.state_machine import StateMachine
+from lib.command_line_input import CommandLineInput
 
 score_thresh = 0.2
 
@@ -146,7 +147,10 @@ if __name__ == '__main__':
         for i in range(5):
             cv2.waitKey(1)
 
-    state_machine = StateMachine(window_name, input_q, output_q,
+    cli_input = CommandLineInput()
+    cli_input.start_capture()
+
+    state_machine = StateMachine(window_name, input_q, output_q, cli_input,
                                  display_output=args.display,
                                  draw_fps=args.fps)
     state_machine.cleanup = cleanup_
