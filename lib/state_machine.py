@@ -4,9 +4,10 @@ import datetime
 from enum import Enum
 from queue import Queue
 from utils import detector_utils
-from typing import List
+from typing import List, Callable, Union, Tuple, Any
 
 from .command_line_input import CommandLineInput
+
 
 class State(Enum):
     DEFINE_AOI_MARKERSELECTION = 11
@@ -15,6 +16,18 @@ class State(Enum):
     PAUSED = 2
     INITIAL = 3
     EXITING = 4
+
+
+class Command:
+    def __init__(self, cmd: Callable[[], Any]):
+        self.execute = cmd
+
+    def execute(self):
+        pass
+
+
+class CommandNotFoundException(Exception):
+    pass
 
 
 class InvalidTransitionError(Exception):
@@ -88,12 +101,38 @@ class StateMachine:
                                 "it didn't work, although it should've."
                                 .format(e.end.name))
 
-    def _register_command(self, key, description, action):
+    def _register_command(self, key: str, description: str,
+                          action: Union[Command, State]):
+
+        if isinstance(action, State):
+            action = Command(lambda: self._enter_state(action))
+
         self._commands[key] = (description, action)
 
-    def _check_transition(self, state, allowed_origins: List):
+    def _check_transition(self, state: State, allowed_origins: List[State]):
         if self.current_state not in allowed_origins:
             raise InvalidTransitionError(self.current_state, state)
+
+    def _get_command(self, command: str) -> Tuple[str, Command]:
+        if command not in self._commands:
+            raise CommandNotFoundException("The command {} is not vaild."
+                                           .format(command))
+
+        return self._commands[command]
+
+    def _execute_command(self, input_: str):
+        """Checks if the input corresponds to a command and executes it."""
+
+        try:
+            _, action = self._get_command(input_)
+        except CommandNotFoundException:
+            # TODO Let the user know, that the input was not a valid command.
+            return
+
+        action.execute()
+
+        # Execute any callback which may have been defined by entering a state.
+        self._key_handler(input_)
 
     def _enter_state(self, state: State):
         msg = "Entering state {}...".format(state.name)
@@ -120,7 +159,7 @@ class StateMachine:
                 key='c',
                 description="Cancel current operation and go to previous "
                             "state ({}).".format(self._previous_state.name),
-                action=lambda: self._return_to_previous_state()
+                action=Command(lambda: self._return_to_previous_state())
             )
 
         if state == State.INITIAL:
@@ -243,25 +282,6 @@ class StateMachine:
         # `_start_kbd_capture()`.
         print("Enter a command and press return: ", end="", flush=True)
 
-    def _handle_input(self, input_):
-        """Checks if the input corresponds to a command and execute it."""
-
-        if input_ not in self._commands:
-            # TODO Let the user know, that the input was not a valid command.
-            return
-
-        action = self._commands[input_][1]
-        if callable(action):
-            action()
-
-        # This allows a shortcut definition to enter a new state (rather than
-        # defining a lambda which call `_enter_state`).
-        elif isinstance(action, State):
-            self._enter_state(action)
-
-        # Execute any callback which may have been defined by entering a state.
-        self._key_handler(input_)
-
     def run(self):
         if self.next_image is None:
             raise Exception("You have to define a function which returns "
@@ -279,7 +299,7 @@ class StateMachine:
             else:
                 key = chr(cv2.waitKey(1) & 0xFF).lower()
 
-            self._handle_input(key)
+            self._execute_command(key)
 
             if self._stop:
                 print("Exiting...")
