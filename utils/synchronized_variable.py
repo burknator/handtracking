@@ -15,3 +15,8 @@ class SynchronizedVariable(Generic[T]):
     @property
     def value(self) -> T:
         return self._value
+
+    @value.setter
+    def value(self, new_value: T) -> T:
+        with self.lock:
+            self._value = new_value
