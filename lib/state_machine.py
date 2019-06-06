@@ -207,13 +207,14 @@ class StateMachine:
 
             self._playback_paused = True
 
-            def pause_or_resume():
-                self._playback_paused = not self._playback_paused
+            def resume():
+                self._playback_paused = False
+                self._enter_state(State.INITIAL)
 
             self._register_command(
                 key='p',
                 description='Resume playback.',
-                action=pause_or_resume
+                action=resume
             )
 
             self._key_handler = pause_key_handler
