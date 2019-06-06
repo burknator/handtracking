@@ -1,13 +1,15 @@
 import argparse
 import copy
 
-from multiprocessing import Queue, Pool
+from multiprocessing import Queue
+from threading import Thread
 
 import cv2
 
 from utils import Worker, Calibration
 from utils.webcam_video_stream import WebcamVideoStream
 from utils.zmq_publisher import HandPositionPublisher, MarkerPublisher
+from utils.synchronized_variable import SynchronizedVariable
 from lib.state_machine import StateMachine
 from lib.command_line_input import CommandLineInput
 
@@ -121,9 +123,11 @@ if __name__ == '__main__':
     else:
         calibration = None
 
-    worker_pool = Pool(args.num_workers, lambda *args: Worker(*args).run(),
-                       (input_q, output_q, marker_q, center_points_q,
-                        cap_params, calibration))
+    for i in range(args.num_workers):
+        Thread(target=lambda *args: Worker(*args).run(), daemon=True,
+               args=(input_q, output_q, marker_q, center_points_q,
+                     cap_params, calibration))\
+            .start()
 
     window_name = 'Multi-Threaded Detection'
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -132,9 +136,6 @@ if __name__ == '__main__':
         print("Stopping ZMQ publishers...")
         for publisher in zmq_publishers:
             publisher.cancel()
-
-        print("Terminating workers...")
-        worker_pool.terminate()
 
         print("Cleaning up...")
         cleanup()
