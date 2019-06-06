@@ -123,10 +123,12 @@ if __name__ == '__main__':
     else:
         calibration = None
 
+    latest_markers = SynchronizedVariable([])
+
     for i in range(args.num_workers):
         Thread(target=lambda *args: Worker(*args).run(), daemon=True,
                args=(input_q, output_q, marker_q, center_points_q,
-                     cap_params, calibration))\
+                     cap_params, latest_markers, calibration))\
             .start()
 
     window_name = 'Multi-Threaded Detection'
@@ -153,7 +155,7 @@ if __name__ == '__main__':
 
     state_machine = StateMachine(window_name, input_q, output_q, cli_input,
                                  display_output=args.display,
-                                 draw_fps=args.fps)
+                                 draw_fps=args.fps, latest_markers=latest_markers)
     state_machine.cleanup = cleanup_
     state_machine.next_image = next_image
 

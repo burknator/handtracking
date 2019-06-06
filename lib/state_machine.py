@@ -4,9 +4,12 @@ import datetime
 from enum import Enum
 from queue import Queue
 from utils import detector_utils
-from typing import List, Callable, Tuple, Dict
+from typing import List, Callable, Tuple
 
 from .command_line_input import CommandLineInput
+from utils.synchronized_variable import SynchronizedVariable
+
+from shapely.geometry import Point, Polygon
 
 
 class State(Enum):
@@ -35,12 +38,14 @@ class StateMachine:
 
     def __init__(self, window_name: str, input_queue: Queue,
                  output_queue: Queue, cli_input: CommandLineInput,
+                 latest_markers: SynchronizedVariable[list],
                  display_output=False, draw_fps=False):
         self.window_name = window_name
         self.input_queue = input_queue
         self.output_queue = output_queue
         self.display_output = display_output
         self.draw_fps = draw_fps
+        self.latest_markers = latest_markers
 
         self.cleanup = lambda: ()
         self.next_image = None
@@ -56,6 +61,7 @@ class StateMachine:
         self._stop = False
         self._cli = cli_input
         self._commands = {}
+        self._inter_state_store = None
 
     @property
     def current_state(self):
@@ -183,7 +189,7 @@ class StateMachine:
             self._register_command(
                 key='a',
                 description="Start defining AOI.",
-                action=lambda: self._enter_state(State.DEFINE_AOI_MARKERSELECTION)
+                action=lambda: self._enter_state(State.DEFINE_AOI_NAME_AOI)
             )
 
             def normal_key_handler(key: str):
@@ -222,22 +228,56 @@ class StateMachine:
             self.current_state = state
 
         elif state == State.DEFINE_AOI_MARKERSELECTION:
-            self._check_transition(state, [State.INITIAL,
-                                           State.DEFINE_AOI_NAME_AOI,
+            self._check_transition(state, [State.DEFINE_AOI_NAME_AOI,
                                            State.DEFINE_AOI_DRAW_AOI])
 
-            help_text = ("Click on a marker with the LEFT mouse button "
-                         "to select it for the current AOI, use the "
-                         "RIGHT mouse button to deselect it.")
+            aoi_name = self._inter_state_store["name"]
+
+            help_text = ("De-/Select the relevent markers for the AOI {} by "
+                         "left clicking them.").format(aoi_name)
+
+            marker_polygons = {}
+            markers = {marker["id"]: marker for marker in self.latest_markers.value}
+            selected_markers = {marker["id"]: False for marker in self.latest_markers.value}
+            for marker in self.latest_markers.value:
+                marker_polygons[marker["id"]] = Polygon(marker["corners"])
 
             # TODO Register click handler for marker selection
+            def clicky(event, x, y, flags, param):
+                if event != cv2.EVENT_LBUTTONDOWN:
+                    return
+
+                point = Point(x, y)
+                for id, polygon in marker_polygons.items():
+                    if not polygon.contains(point):
+                        continue
+
+                    if selected_markers[id]:
+                        print("deselected marker {}".format(id))
+                    else:
+                        print("selected marker {}".format(id))
+
+                    selected_markers[id] = not selected_markers[id]
+
+            self._click_handler = clicky
             # TODO Left click selects marker, right click deselects marker
+
+            def save_markers_and_continue():
+                selected_ids = []
+                for id, selected in selected_markers.items():
+                    if selected:
+                        selected_ids.append(id)
+                        self._inter_state_store["markers"].append(markers[id])
+
+                print("You selected the markers with the IDs {} for the AOI with name {}".format(selected_ids, aoi_name))
+
+                self._enter_state(State.DEFINE_AOI_DRAW_AOI)
 
             self._register_command(
                 key='d',
                 description='Save current marker selection and continue to the'
                             'next step.',
-                action=lambda: self._enter_state(State.DEFINE_AOI_DRAW_AOI)
+                action=save_markers_and_continue
             )
 
             self.current_state = state
@@ -262,14 +302,26 @@ class StateMachine:
             self.current_state = state
 
         elif state == State.DEFINE_AOI_NAME_AOI:
-            self._check_transition(state, [State.DEFINE_AOI_DRAW_AOI])
+            self._check_transition(state, [State.INITIAL])
+
+            help_text = ("You will now define a SINGLE AOI. We start with the "
+                         "name, after that select the relevant markers and "
+                         "then draw the actual AOI. The program will guide "
+                         "you through this process.")
+
+            self._playback_paused = True
 
             aoi_name = self._cli.input('Enter name for AOI: ')
-            print("Chosen name: {}".format(aoi_name))
+
+            self._inter_state_store = {
+                "name": aoi_name,
+                "markers": []
+            }
 
             self._register_command(
                 key='d',
-                description='Save the current AOI and add another one.',
+                description='Save the current AOI name and continue with'
+                            'selecting the markers for this AOI.',
                 action=lambda: self._enter_state(State.DEFINE_AOI_MARKERSELECTION)
             )
 

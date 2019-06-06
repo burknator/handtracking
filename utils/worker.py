@@ -21,6 +21,7 @@ _aruco_parameters = aruco.DetectorParameters_create()
 class Worker:
     def __init__(self, input_q: Queue, output_q: Queue, marker_q: Queue,
                  center_points_q: Queue, cap_params: Dict[str, Any],
+                 latest_markers: SynchronizedVariable,
                  calibration: Calibration = None):
         self.input_q = input_q
         self.output_q = output_q
@@ -29,6 +30,7 @@ class Worker:
         self.cap_params = cap_params
         self.calibration = calibration
         self.detection_graph, self.sess = load_inference_graph()
+        self.latest_markers = latest_markers
 
     def _detect_hands(self, frame, o_frame: SynchronizedVariable):
         # Actual detection. Variable boxes contains the bounding box
@@ -61,12 +63,16 @@ class Worker:
         if ids is None:
             return
 
+        #print("Previous latest markers: {}".format(self.latest_markers))
         markers = []
         for i in range(len(corners)):
             markers.append({
                 'id': int(ids[i][0]),
                 'corners': corners[i][0].astype(int).tolist(),
             })
+
+        self.latest_markers.value = markers
+
         self.marker_q.put(markers)
 
         with o_frame.lock:
