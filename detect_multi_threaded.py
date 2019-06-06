@@ -5,7 +5,7 @@ from multiprocessing import Queue, Pool
 
 import cv2
 
-from utils import detector_utils as detector_utils, Worker, Calibration
+from utils import Worker, Calibration
 from utils.webcam_video_stream import WebcamVideoStream
 from utils.zmq_publisher import HandPositionPublisher, MarkerPublisher
 from lib.state_machine import StateMachine

@@ -1,13 +1,14 @@
 import time
 
 from threading import Thread
+from queue import Queue
 
 import zmq
 import msgpack as serializer
 
 
 class ZmqPublisher(Thread):
-    def __init__(self, q, topic):
+    def __init__(self, q: Queue, topic: str):
         super().__init__()
         self.q = q
         self.topic = topic
