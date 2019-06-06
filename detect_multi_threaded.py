@@ -34,14 +34,14 @@ if __name__ == '__main__':
                              'setting.')
     parser.add_argument('-nhands', '--num_hands', dest='num_hands', type=int,
                         default=2, help='Max number of hands to detect.')
-    parser.add_argument('-fps', '--fps', dest='fps', type=bool, default=True,
+    parser.add_argument('-fps', '--fps', dest='fps', type=int, default=True,
                         help='Show FPS on detection/display visualization')
     parser.add_argument('-wd', '--width', dest='width', type=int, default=888,
                         help='Width of the frames in the video stream.')
     parser.add_argument('-ht', '--height', dest='height', type=int,
                         default=500,
                         help='Height of the frames in the video stream.')
-    parser.add_argument('-ds', '--display', dest='display', type=bool,
+    parser.add_argument('-ds', '--display', dest='display', type=int,
                         default=True,
                         help='Display the detected images using OpenCV. This '
                         'reduces FPS')
