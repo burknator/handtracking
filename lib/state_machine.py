@@ -4,7 +4,7 @@ import datetime
 from enum import Enum
 from queue import Queue
 from utils import detector_utils
-from typing import List, Callable, Tuple
+from typing import List, Callable, Tuple, Dict
 
 from .command_line_input import CommandLineInput
 
@@ -44,6 +44,8 @@ class StateMachine:
 
         self.cleanup = lambda: ()
         self.next_image = None
+
+        self._playback_paused = False
 
         self._current_state = State.INITIAL
         self._previous_state = State.INITIAL
@@ -203,7 +205,17 @@ class StateMachine:
                     # TODO Next frame
                     pass
 
-            self._click_handler = lambda *args: ()
+            self._playback_paused = True
+
+            def pause_or_resume():
+                self._playback_paused = not self._playback_paused
+
+            self._register_command(
+                key='p',
+                description='Resume playback.',
+                action=pause_or_resume
+            )
+
             self._key_handler = pause_key_handler
 
             self.current_state = state
@@ -297,6 +309,9 @@ class StateMachine:
 
             # Register any click handler a state may have defined.
             cv2.setMouseCallback(self.window_name, self._click_handler)
+
+            if self._playback_paused:
+                continue
 
             frame = self.next_image()
             self._num_frames += 1
