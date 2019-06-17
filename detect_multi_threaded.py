@@ -3,6 +3,7 @@ import copy
 
 from multiprocessing import Queue
 from threading import Thread
+from typing import List, Dict
 
 import cv2
 
@@ -12,6 +13,11 @@ from utils.zmq_publisher import HandPositionPublisher, MarkerPublisher
 from utils.synchronized_variable import SynchronizedVariable
 from lib.state_machine import StateMachine
 from lib.command_line_input import CommandLineInput
+from state_implementations.define_aoi_state import DefineAoi
+from state_implementations.initial_state import InitialState
+from state_implementations.exit_state import ExititingState
+from state_implementations.aoi_mkr_selection_state import DefineAoiMarkerSelectionState
+from state_implementations.aoi_name_state import DefineAoiNameState
 
 score_thresh = 0.2
 
@@ -123,7 +129,7 @@ if __name__ == '__main__':
     else:
         calibration = None
 
-    latest_markers = SynchronizedVariable([])
+    latest_markers: SynchronizedVariable[List[Dict]] = SynchronizedVariable([])
 
     for i in range(args.num_workers):
         Thread(target=lambda *args: Worker(*args).run(), daemon=True,
@@ -153,10 +159,22 @@ if __name__ == '__main__':
     cli_input = CommandLineInput()
     cli_input.start_capture()
 
-    state_machine = StateMachine(window_name, input_q, output_q, cli_input,
-                                 display_output=args.display,
-                                 draw_fps=args.fps, latest_markers=latest_markers)
-    state_machine.cleanup = cleanup_
-    state_machine.next_image = next_image
+    InitialState.init_args = (next_image,)
+    DefineAoi.init_args = (latest_markers,)
+    DefineAoi.initial_state = DefineAoiMarkerSelectionState
+    DefineAoiNameState.init_args = (cli_input,)
+    ExititingState.init_args = (cleanup_,)
 
-    state_machine.run()
+    state_machine = StateMachine(window_name, cli_input, input_q, output_q, args.fps,
+                                 args.display)
+
+    state_machine.enter_state(InitialState)
+    running = True
+    while True:
+        exit_state = state_machine.run()
+
+        if not running:
+            break
+
+        if isinstance(state_machine.current_state, ExititingState):
+            running = False

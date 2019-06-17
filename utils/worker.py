@@ -3,6 +3,7 @@ import copy
 from typing import Dict, Any
 from queue import Queue
 from threading import Thread
+from typing import NoReturn, List, Dict
 
 from cv2 import aruco
 
@@ -21,7 +22,7 @@ _aruco_parameters = aruco.DetectorParameters_create()
 class Worker:
     def __init__(self, input_q: Queue, output_q: Queue, marker_q: Queue,
                  center_points_q: Queue, cap_params: Dict[str, Any],
-                 latest_markers: SynchronizedVariable,
+                 latest_markers: SynchronizedVariable[List[Dict]],
                  calibration: Calibration = None):
         self.input_q = input_q
         self.output_q = output_q
@@ -91,7 +92,7 @@ class Worker:
                                self.calibration.dist_coeffs, rotation_vecs[i],
                                translation_vecs[i], 0.01)
 
-    def run(self):
+    def run(self) -> NoReturn:
         while True:
             frame = self.input_q.get()
 
