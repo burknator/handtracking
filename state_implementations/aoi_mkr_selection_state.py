@@ -6,17 +6,17 @@ from .define_aoi_state import DefineAoi
 from .aoi_draw_state import DefineAoiDrawState
 from .aoi_name_state import DefineAoiNameState
 import lib.commandable_state_machine as cmd_state_machine
-import lib.state_machine as sm
 
 from lib import InvalidTransitionError
+from lib.opencv_window import OpenCVWindow
 
 
 class DefineAoiMarkerSelectionState(cmd_state_machine.CommandableStateMachine):
-    def __init__(self):
+    def __init__(self, window: OpenCVWindow):
         super().__init__()
 
+        self.window = window
         self.selected_markers = {}
-        self.markers = {}
         self.marker_polygons = {}
         self.define_aoi_state: DefineAoi
 
@@ -33,6 +33,10 @@ class DefineAoiMarkerSelectionState(cmd_state_machine.CommandableStateMachine):
     def aoi_name(self) -> str:
         return self.define_aoi_state.name
 
+    @property
+    def markers(self):
+        return self.define_aoi_state.markers.value
+
     def enter(self, parent_state: DefineAoi):
         if type(parent_state.current_state) not in [DefineAoiDrawState, DefineAoiNameState]:
             raise InvalidTransitionError(type(parent_state.current_state), type(self))
@@ -44,8 +48,7 @@ class DefineAoiMarkerSelectionState(cmd_state_machine.CommandableStateMachine):
         for marker in parent_state.markers.value:
             self.marker_polygons[marker["id"]] = Polygon(marker["corners"])
 
-        sm.StateMachine._click_handler = self.clicky
-        sm.StateMachine.test()
+        self.window.set_click_handler(self.clicky)
 
         self._register_command(
             key='d',

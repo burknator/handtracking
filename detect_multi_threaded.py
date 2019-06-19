@@ -13,6 +13,7 @@ from utils.zmq_publisher import HandPositionPublisher, MarkerPublisher
 from utils.synchronized_variable import SynchronizedVariable
 from lib.state_machine import StateMachine
 from lib.command_line_input import CommandLineInput
+from lib.opencv_window import OpenCVWindow
 from state_implementations.define_aoi_state import DefineAoi
 from state_implementations.initial_state import InitialState
 from state_implementations.exit_state import ExititingState
@@ -137,8 +138,8 @@ if __name__ == '__main__':
                      cap_params, latest_markers, calibration))\
             .start()
 
-    window_name = 'Multi-Threaded Detection'
-    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    window = OpenCVWindow('Multi-Threaded Detection')
+    window.create()
 
     def cleanup_():
         print("Stopping ZMQ publishers...")
@@ -149,23 +150,19 @@ if __name__ == '__main__':
         cleanup()
 
         print("Closing OpenCV windows...")
-        cv2.destroyAllWindows()
-
-        # Workaround for not closing windows
-        # (source: https://stackoverflow.com/a/50538883)
-        for i in range(5):
-            cv2.waitKey(1)
+        window.destroy()
 
     cli_input = CommandLineInput()
     cli_input.start_capture()
 
-    InitialState.init_args = (next_image,)
+    InitialState.init_args = (next_image, window)
     DefineAoi.init_args = (latest_markers,)
     DefineAoi.initial_state = DefineAoiMarkerSelectionState
     DefineAoiNameState.init_args = (cli_input,)
+    DefineAoiMarkerSelectionState.init_args = (window,)
     ExititingState.init_args = (cleanup_,)
 
-    state_machine = StateMachine(window_name, cli_input, input_q, output_q, args.fps,
+    state_machine = StateMachine(window, cli_input, input_q, output_q, args.fps,
                                  args.display)
 
     state_machine.enter_state(InitialState)

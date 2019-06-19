@@ -1,17 +1,21 @@
 import cv2
 import datetime
 
+from typing import Callable
+
 import lib.state_machine as stt_mhn
 import lib.commandable_state_machine as cmd_state_machine
 import utils.detector_utils as detector_utils
-
 import state_implementations as states
+
+from lib.opencv_window import OpenCVWindow
 
 
 class InitialState(cmd_state_machine.CommandableStateMachine):
-    def __init__(self, next_image):
+    def __init__(self, next_image: Callable, window: OpenCVWindow):
         super().__init__()
 
+        self.window = window
         self.next_image = next_image
 
         self._start_time = datetime.datetime.now()
@@ -62,7 +66,7 @@ class InitialState(cmd_state_machine.CommandableStateMachine):
         if parent_state.display_output:
             if parent_state.draw_fps:
                 detector_utils.draw_fps_on_image(fps, output_frame)
-            cv2.imshow(parent_state.window_name, output_frame)
+            self.window.show_frame(output_frame)
         else:
             print("frames processed: {}, elapsed time: {}, fps: {}"
                   .format(self._num_frames, elapsed_time, fps))

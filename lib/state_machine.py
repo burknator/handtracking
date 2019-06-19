@@ -1,30 +1,25 @@
-import cv2
 import datetime
 
 from typing import Type
 from queue import Queue
 
 import lib.commandable_state_machine as cmd_state_machine
+import state_implementations as states
 
 from lib.vsm import VSM
 from lib.command_line_input import CommandLineInput
-import state_implementations as states
+from lib.opencv_window import OpenCVWindow
 
 
 class StateMachine(cmd_state_machine.CommandableStateMachine):
-    _key_handler = lambda key: ()
-    _click_handler = lambda *args: ()
-    test = lambda: ()
-
-    def __init__(self, window_name, cli_input: CommandLineInput,
+    def __init__(self, window: OpenCVWindow, cli_input: CommandLineInput,
                  input_queue: Queue, output_queue: Queue, draw_fps=False,
                  display_output=False):
         super().__init__()
 
-        self.window_name = window_name
+        self.window = window
         self.cleanup = lambda: ()
         self.next_image = None
-
 
         self._stop = False
         self._cli = cli_input
@@ -36,8 +31,6 @@ class StateMachine(cmd_state_machine.CommandableStateMachine):
         self.display_output = display_output
         self.draw_fps = draw_fps
 
-        StateMachine.test = lambda: cv2.setMouseCallback(self.window_name, StateMachine._click_handler)
-
     def _get_elapsed_time(self):
         return (datetime.datetime.now() - self._start_time).total_seconds()
 
@@ -47,6 +40,11 @@ class StateMachine(cmd_state_machine.CommandableStateMachine):
 
     def _return_to_previous_state(self):
         raise NotImplementedError()
+
+    @staticmethod
+    def _key_handler(*args):
+        """Dummy key handler, in case none is ever assigned by a state."""
+        pass
 
     def enter_state(self, state: Type[VSM]):
         super().enter_state(state)
@@ -75,7 +73,7 @@ class StateMachine(cmd_state_machine.CommandableStateMachine):
         if self._cli.has_input():
             key = self._cli.get_input().lower()
         else:
-            key = chr(cv2.waitKey(1) & 0xFF).lower()
+            key = self.window.get_pressed_key()
 
         new_state = self._execute_command(key)
 
