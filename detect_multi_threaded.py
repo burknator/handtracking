@@ -19,6 +19,7 @@ from state_implementations.initial_state import InitialState
 from state_implementations.exit_state import ExititingState
 from state_implementations.aoi_mkr_selection_state import DefineAoiMarkerSelectionState
 from state_implementations.aoi_name_state import DefineAoiNameState
+from state_implementations.aoi_draw_state import DefineAoiDrawState
 
 score_thresh = 0.2
 
@@ -160,6 +161,7 @@ if __name__ == '__main__':
     DefineAoi.initial_state = DefineAoiMarkerSelectionState
     DefineAoiNameState.init_args = (cli_input,)
     DefineAoiMarkerSelectionState.init_args = (window, cli_input)
+    DefineAoiDrawState.init_args = (window, cli_input)
     ExititingState.init_args = (cleanup_,)
 
     state_machine = StateMachine(window, cli_input, input_q, output_q, args.fps,
