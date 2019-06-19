@@ -16,8 +16,8 @@ class DefineAoiMarkerSelectionState(cmd_state_machine.CommandableStateMachine):
         super().__init__()
 
         self.window = window
-        self.selected_markers = {}
-        self.marker_polygons = {}
+        self.selections = {}
+        self.polygons = {}
         self.define_aoi_state: DefineAoi
 
     @property
@@ -35,7 +35,7 @@ class DefineAoiMarkerSelectionState(cmd_state_machine.CommandableStateMachine):
 
     @property
     def markers(self):
-        return self.define_aoi_state.markers.value
+        return self.define_aoi_state.visible_markers.value
 
     def enter(self, parent_state: DefineAoi):
         if type(parent_state.current_state) not in [DefineAoiDrawState, DefineAoiNameState]:
@@ -43,46 +43,38 @@ class DefineAoiMarkerSelectionState(cmd_state_machine.CommandableStateMachine):
 
         self.define_aoi_state = parent_state
 
-        self.marker_polygons = {}
-        self.selected_markers = {marker["id"]: False for marker in self.markers}
-        for marker in parent_state.markers.value:
-            self.marker_polygons[marker["id"]] = Polygon(marker["corners"])
+        for marker in self.markers:
+            self.polygons[marker['id']] = Polygon(marker["corners"])
+            self.selections[marker['id']] = False
 
-        self.window.set_click_handler(self.clicky)
+        self.window.set_click_handler(self.select_marker)
 
         self._register_command(
             key='d',
-            description='Save current marker selection and continue to the'
+            description='Save current marker selection and continue to the '
                         'next step.',
             action=self.save_markers_and_continue
         )
 
     def save_markers_and_continue(self):
-        selected_ids = []
-        with self.define_aoi_state.markers.lock:
-            for id_, selected in self.selected_markers.items():
-                if not selected:
-                    continue
-                selected_ids.append(id_)
-                self.define_aoi_state.markers.value.append(self.markers[id_])
+        self.define_aoi_state.selected_markers =\
+            set(id_ for id_, selected in self.selections.items() if selected)
 
-        print("You selected the markers with the IDs {} for the AOI with name {}".format(selected_ids, self.aoi_name))
+        print("You selected the markers with the IDs {} for the AOI with name {}".format(self.define_aoi_state.selected_markers, self.aoi_name))
 
         return DefineAoiDrawState
 
-    # TODO Register click handler for marker selection
-    def clicky(self, event, x, y, flags, param):
+    def select_marker(self, event, x, y, flags, param):
         if event != cv2.EVENT_LBUTTONDOWN:
             return
 
+        ERASE_LINE = '\x1b[2K'
+
         point = Point(x, y)
-        for id, polygon in self.marker_polygons.items():
+        for id_, polygon in self.polygons.items():
             if not polygon.contains(point):
                 continue
 
-            if self.selected_markers[id]:
-                print("deselected marker {}".format(id))
-            else:
-                print("selected marker {}".format(id))
+            self.selections[id_] = not self.selections[id_]
 
-            self.selected_markers[id] = not self.selected_markers[id]
+            print(ERASE_LINE + "selected markers {}".format(self.selections), end="\r")

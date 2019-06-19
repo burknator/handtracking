@@ -10,7 +10,8 @@ class DefineAoi(cmd_state_machine.CommandableStateMachine):
     def __init__(self, markers: SynchronizedVariable[List[Dict]]):
         super().__init__()
         self.name = ""
-        self.markers = markers
+        self.visible_markers = markers
+        self.selected_markers = set()
 
     def enter(self, sm):
         self._register_command(
