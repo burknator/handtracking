@@ -3,6 +3,9 @@ from threading import Thread
 
 
 class CommandLineInput:
+    # ANSI command to erase last line
+    ERASE_LINE = '\x1b[2K'
+
     def __init__(self):
         self._input_queue = Queue()
         self._thread = Thread(target=self._capture_input, daemon=True)
@@ -47,3 +50,7 @@ class CommandLineInput:
 
         print(prompt, end='', flush=True)
         return self._input_queue.get()
+
+    def print_continuous(self, text: str):
+        # Replaces the last printed line with the new text.
+        print(CommandLineInput.ERASE_LINE + text, end="\r")

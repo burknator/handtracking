@@ -2,20 +2,22 @@ import cv2
 
 from shapely.geometry import Point, Polygon
 
+import lib.commandable_state_machine as cmd_state_machine
+
 from .define_aoi_state import DefineAoi
 from .aoi_draw_state import DefineAoiDrawState
 from .aoi_name_state import DefineAoiNameState
-import lib.commandable_state_machine as cmd_state_machine
-
 from lib import InvalidTransitionError
 from lib.opencv_window import OpenCVWindow
+from lib.command_line_input import CommandLineInput
 
 
 class DefineAoiMarkerSelectionState(cmd_state_machine.CommandableStateMachine):
-    def __init__(self, window: OpenCVWindow):
+    def __init__(self, window: OpenCVWindow, cli: CommandLineInput):
         super().__init__()
 
         self.window = window
+        self.cli = cli
         self.selections = {}
         self.polygons = {}
         self.define_aoi_state: DefineAoi
@@ -68,8 +70,6 @@ class DefineAoiMarkerSelectionState(cmd_state_machine.CommandableStateMachine):
         if event != cv2.EVENT_LBUTTONDOWN:
             return
 
-        ERASE_LINE = '\x1b[2K'
-
         point = Point(x, y)
         for id_, polygon in self.polygons.items():
             if not polygon.contains(point):
@@ -77,4 +77,4 @@ class DefineAoiMarkerSelectionState(cmd_state_machine.CommandableStateMachine):
 
             self.selections[id_] = not self.selections[id_]
 
-            print(ERASE_LINE + "selected markers {}".format(self.selections), end="\r")
+            self.cli.print_continuous("selected markers {}".format(self.selections))

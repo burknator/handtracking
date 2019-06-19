@@ -159,7 +159,7 @@ if __name__ == '__main__':
     DefineAoi.init_args = (latest_markers,)
     DefineAoi.initial_state = DefineAoiMarkerSelectionState
     DefineAoiNameState.init_args = (cli_input,)
-    DefineAoiMarkerSelectionState.init_args = (window,)
+    DefineAoiMarkerSelectionState.init_args = (window, cli_input)
     ExititingState.init_args = (cleanup_,)
 
     state_machine = StateMachine(window, cli_input, input_q, output_q, args.fps,
